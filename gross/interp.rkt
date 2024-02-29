@@ -4,6 +4,8 @@
 
 (provide interp-err)
 
+(define zip (lambda (l1 l2) (map list l1 l2)))
+
 ;; interp-err :: Expr -> Val or Err
 (define (interp-err e)
   (with-handlers ([Err? (λ (err) err)])
@@ -27,15 +29,7 @@
     [(cons formal-args body) (let ((interped-args (map (λ (arg)
                                                          (interp defn env arg))
                                                        actual-args)))
-                               (interp defn (mk-fn-env formal-args interped-args) body))]))
-    
-
-;; mk-fn-env :: Listof Symbol -> Listof Val -> Env
-(define (mk-fn-env formal actual)
-  (match* (formal actual)
-    [('() '()) '()] ; functions have their own empty env
-    [((cons x frest) (cons v arest)) (store (mk-fn-env frest arest)
-                                            x v)])) ; env is populated with function args
+                               (interp defn (zip formal-args interped-args) body))]))
 
 ;; lookup-defn :: Symbol -> Listof Defn -> (Symbols, Expr)
 (define (lookup-defn f defns)
