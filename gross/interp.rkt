@@ -4,8 +4,6 @@
 
 (provide interp-err)
 
-(define zip (λ (l1 l2) (map list l1 l2)))
-
 ;; interp-err :: Expr -> Val or Err
 (define (interp-err e)
   (with-handlers ([Err? (λ (err) err)])
@@ -22,16 +20,22 @@
     [(Let x e1 e2) (interp defn
                     (store env x (interp defn env e1))
                     e2)]
-    [(App f actual) (match (lookup-defn f defn)
-                    [(cons formal body) (interp defn
-                                                (mk-local-env defn env (zip formal actual))
-                                                body)])]))
+    [(App f actual) (interp-app defn env f actual)]))
 
-;; mk-local-env :: Listof Defn -> Env -> Listof (Symbol, Expr)
-(define (mk-local-env defn env params)
-  (match params
-    ['() env]
-    [(cons (list x y) rest) (mk-local-env defn (store env x (interp defn env y)) rest)]))
+(define (interp-app defn env f actual-args)
+  (match (lookup-defn f defn) ; lookup the function defintions
+    [(cons formal-args body) (let ((interped-args (map (λ (arg)
+                                                         (interp defn env arg))
+                                                       actual-args)))
+                               (interp defn (mk-fn-env formal-args interped-args) body))]))
+    
+
+;; mk-fn-env :: Listof Symbol -> Listof Val -> Env
+(define (mk-fn-env formal actual)
+  (match* (formal actual)
+    [('() '()) '()] ; functions have their own empty env
+    [((cons x frest) (cons v arest)) (store (mk-fn-env frest arest)
+                                            x v)])) ; env is populated with function args
 
 ;; lookup-defn :: Symbol -> Listof Defn -> (Symbols, Expr)
 (define (lookup-defn f defns)
@@ -128,6 +132,13 @@
                                             (if (<= x 0) (* -1 x) x))
 
                                           (abs -42)))) 42)
+
+  (check-equal? (interp-err (parse-prog '((define (true? x)
+                                            (and x y))
+
+                                          (let ((y #t))
+                                            (true? #t)))))
+                (Err "Unbound identifier: y"))
 
   (check-equal? (interp-err (parse-prog '((define (odd? x)
                                             (if (zero? x) #f
