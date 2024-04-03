@@ -19,6 +19,8 @@
     [(If e1 e2 e3)   (interp-if D E e1 e2 e3)]
     [(Let x e1 e2)   (interp D (store E x (interp D E e1)) e2)]
     [(Lam xs e)      (interp-lam D E xs e)]
+    [(Defn x xs e)   (interp-lam D '() xs e)]
+    [(DefnV x e)     (interp D '() e)]
     [(App e es)      (interp-app D E e es)]))
 
 ;; interp-lam :: Defn -> Env -> Vars -> Expr -> Val
@@ -29,8 +31,7 @@
 ;; interp-app :: Defn -> Env -> Expr -> Exprs -> Val
 (define (interp-app D E f es)
     (let ([fn   (interp D E f)]
-          [args (map (λ (arg)
-                       (interp D E arg)) es)])
+          [args (map (λ (arg) (interp D E arg)) es)])
          (fn args)))
 
 ;; interp-prog :: Prog -> Val
@@ -96,19 +97,19 @@
 (define (lookup D E x)
   ; lookup the environment first, then the list of definitions
   (match E
-    ['()                      (lookup-defn D D x)]
+    ['()                      (lookup-defn D E D x)]
     [(cons (list y val) rest) (if (eq? x y) val
                                   (lookup D rest x))]))
 
 ;; lookup-defn :: Defn -> Defn -> Symbol -> Val
-(define (lookup-defn D defns x)
+(define (lookup-defn D E defns x)
   (match defns
     ['()                          (raise (Err
                                           (string-append "Unbound identifier: "
                                                          (symbol->string x))))]
     [(cons (Defn f xs body) rest) (if (eq? f x)
-                                      (λ (aargs) (interp D (zip xs aargs) body))
-                                      (lookup-defn D rest x))]
+                                      (interp D E (Defn f xs body))
+                                      (lookup-defn D E rest x))]
     [(cons (DefnV y e) rest)      (if (eq? x y)
-                                      (interp D '() e)
+                                      (interp D E (DefnV y e))
                                       (lookup-defn D rest x))]))
